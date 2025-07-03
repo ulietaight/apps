@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  backend:
+    image: ghcr.io/ulietaight/apps-backend:latest
+    container_name: apps-backend
+    restart: always
+    ports:
+      - '3000:3000'
+    environment:
+      - NODE_ENV=production
+      # при необходимости:
+      # - DATABASE_URL=postgres://...
+
+  frontend:
+    image: ghcr.io/ulietaight/apps-frontend:latest
+    container_name: apps-frontend
+    restart: always
+    ports:
+      - '80:80'
