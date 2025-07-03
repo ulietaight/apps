@@ -29,6 +29,7 @@ jobs:
       run: |
         docker build -f infra/docker/frontend.Dockerfile -t ghcr.io/${{ secrets.GHCR_USERNAME }}/apps-frontend:latest ./frontend
         docker push ghcr.io/${{ secrets.GHCR_USERNAME }}/apps-frontend:latest
+
     - name: 🚀 Deploy to VPS
       uses: appleboy/ssh-action@v1.0.0
       with:
@@ -36,20 +37,12 @@ jobs:
         username: ${{ secrets.SSH_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          cd /root/apps
+          cd ~
+          if [ ! -d "apps" ]; then
+            git clone https://github.com/${{ github.repository }} apps
+          fi
+          cd apps
           git pull origin main
           export GHCR_USERNAME=${{ secrets.GHCR_USERNAME }}
           export GHCR_TOKEN=${{ secrets.GHCR_TOKEN }}
           bash infra/scripts/deploy.sh
-    - name: 🚀 Initial Deploy to VPS
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
-          if [ ! -d "~/apps" ]; then
-            git clone https://github.com/${{ github.repository }} apps
-          else
-            cd apps && git pull origin main
-          fi
