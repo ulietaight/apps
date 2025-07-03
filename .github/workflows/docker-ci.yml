@@ -18,7 +18,7 @@ jobs:
       uses: docker/setup-buildx-action@v3
 
     - name: Build backend image
-      run: docker build -f infra/docker/backend.Dockerfile -t backend ./apps/backend
+      run: docker build -f ./infra/docker/backend.Dockerfile -t backend ./apps/backend
 
     # - name: Build frontend image
     #   run: docker build -f infra/docker/frontend.Dockerfile -t frontend ./apps/frontend
