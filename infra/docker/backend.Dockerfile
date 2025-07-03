@@ -3,10 +3,10 @@ FROM node:22.17.0-alpine AS builder
 
 WORKDIR /app
 
-COPY apps/backend/package*.json ./
+COPY ./backend/package*.json ./
 RUN npm install
 
-COPY apps/backend .
+COPY ./backend .
 RUN npm run build
 
 # ---------- STAGE 2: Run ----------
