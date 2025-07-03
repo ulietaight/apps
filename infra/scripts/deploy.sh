@@ -14,7 +14,7 @@ docker stop apps-backend || true && docker rm apps-backend || true
 docker stop apps-frontend || true && docker rm apps-frontend || true
 
 echo "🚀 Запускаем прод..."
-docker compose -f infra/docker-compose.prod.yml up -d
+docker-compose -f infra/docker-compose.prod.yml up -d
 
 echo "🧼 Чистим неиспользуемые образы..."
 docker image prune -f
