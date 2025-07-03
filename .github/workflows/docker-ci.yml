@@ -27,7 +27,7 @@ jobs:
 
     - name: Build & Push Frontend
       run: |
-        docker build -f infra/docker/frontend.Dockerfile -t ghcr.io/${{ secrets.GHCR_USERNAME }}/apps-frontend:latest ./frontend
+        docker build -f infra/docker/frontend.Dockerfile -t ghcr.io/${{ secrets.GHCR_USERNAME }}/apps-frontend:latest .
         docker push ghcr.io/${{ secrets.GHCR_USERNAME }}/apps-frontend:latest
 
     - name: 🚀 Deploy to VPS
