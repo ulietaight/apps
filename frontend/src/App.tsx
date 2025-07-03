@@ -6,7 +6,7 @@ function App() {
   useEffect(() => {
     const checkHealth = async () => {
       try {
-        const response = await fetch('http://backend:3000/api/health')
+        const response = await fetch('/api/health')
         const data = await response.json();
         setIsOnline(data.status === 'ok');
       } catch (error) {
