@@ -1,20 +1,18 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { PrismaModule } from './prisma/prisma.module';
+import { RedisModule } from './redis/redis.module';
+import { UserModule } from './user/user.module';
+import { TransactionModule } from './transaction/transaction.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5433'),
-      username: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'Q427001q',
-      database: process.env.DB_NAME || 'postgres',
-      entities: [],
-      synchronize: true,
-    }),
+    PrismaModule,
+    UserModule,
+    TransactionModule,
+    //RedisModule,
+    // другие модули позже (user, transaction и т.п.)
   ],
   controllers: [AppController],
   providers: [AppService],
