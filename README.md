@@ -1,15 +1,47 @@
-# 🚀 Fullstack-приложение на Node.js + React
+# Тестовое приложение: Переводы и транзакции
 
-Проект состоит из frontend (React + Vite) и backend (NestJS + PostgreSQL), развёртываемых в Docker-контейнерах с использованием GitHub Actions и GitHub Container Registry (GHCR).
+## 📦 Стек технологий
 
----
+* **Backend:** NestJS (TypeScript)
+* **ORM:** Prisma
+* **База данных:** PostgreSQL
+* **Кэш:** Redis
+* **Контейнеризация:** Docker, Docker Compose
 
-## 📦 Состав проекта
+## 🚀 Запуск проекта
 
-- **Frontend:** React + Vite + TailwindCSS
-- **Backend:** NestJS + TypeORM + PostgreSQL
-- **CI/CD:** GitHub Actions + SSH-деплой + GHCR
-- **Прод-сборка:** `docker-compose.prod.yml`
+### Установка зависимостей
+
+```bash
+cd backend && npm install
+cd ../frontend && npm install
+```
+
+### Запуск Docker-инфраструктуры (Postgres + Redis)
+
+```bash
+docker compose -f infra/docker-compose.prod.yml up -d
+```
+
+### Применение миграций
+
+```bash
+cd backend
+npx prisma migrate dev
+```
+
+### Запуск backend
+
+```bash
+npm run start:dev
+```
+
+### Запуск frontend
+
+```bash
+cd frontend
+npm run dev
+```
 
 ---
 
@@ -17,40 +49,76 @@
 
 ```
 apps/
-├── backend/                  # NestJS backend
-│   └── src/                  # Исходники
-├── frontend/                 # Vite + React frontend
-│   └── src/                  # Компоненты и страницы
-├── infra/
-│   ├── docker/
-│   │   ├── backend.Dockerfile
-│   │   └── frontend.Dockerfile
-│   ├── nginx/
-│   │   └── frontend.conf     # SPA + proxy
-│   └── scripts/
-│       └── deploy.sh         # Деплой на сервер
-├── .github/
-│   └── workflows/
-│       └── docker-ci.yml     # GitHub Actions CI/CD
-└── docker-compose.prod.yml   # Compose-файл для продакшена
+├── backend/            # Серверная логика на NestJS
+├── frontend/           # Интерфейс на React + Vite
+└── infra/              # Docker, Nginx, скрипты деплоя
 ```
 
 ---
 
-## ⚙️ Установка локально
+## ⚙️ Переменные окружения `.env`
 
-```bash
-# Установка зависимостей
-cd backend && npm install
-cd ../frontend && npm install
+Создай файл `backend/.env` со следующим содержанием:
+
+```env
+# Общие
+PORT=3000
+NODE_ENV=development
+
+# База данных (для Prisma)
+DATABASE_URL=postgresql://postgres:secret@localhost:5432/transactions_db
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# ORM
+ORM=PRISMA # В будущем возможно DRIZZLE
+
+# Транзакционная стратегия
+TRANSACTION_STRATEGY=PESSIMISTIC # Или: OPTIMISTIC, ATOMIC, ISOLATION, NO_TRANSACTION
+ISOLATION_LEVEL=Serializable     # Для ISOLATION: Read Committed, Repeatable Read, Serializable
 ```
 
-Запуск в dev-режиме:
+---
+
+## 🔁 Доступные API-эндпоинты
+
+| Метод | URL                    | Описание                             |
+| ----- | ---------------------- | ------------------------------------ |
+| GET   | `/user/:id/balance`    | Баланс пользователя (кэш + fallback) |
+| POST  | `/transaction`         | Перевод средств между пользователями |
+| GET   | `/transaction/history` | История транзакций пользователя      |
+| GET   | `/admin/transactions`  | Все транзакции (админ)               |
+| GET   | `/admin/strategy`      | Текущая стратегия транзакций         |
+
+---
+
+## ✅ Поддерживаемые стратегии транзакций
+
+* **PESSIMISTIC** — SELECT ... FOR UPDATE
+* **OPTIMISTIC** — по полю `version`
+* **ATOMIC** — без транзакций, через `decrement` / `increment`
+* **ISOLATION** — уровни изоляции, задаются через `ISOLATION_LEVEL`
+* **NO\_TRANSACTION** — без транзакционной обёртки, небезопасно
+
+---
+
+## 🧪 Тесты
+
+* Jest (backend) — юнит- и интеграционные тесты
+* Возможна настройка Postman + Newman для API
+
+---
+
+## 🐳 Docker (для продакшена)
 
 ```bash
-# Backend
-cd backend && npm run start:dev
-
-# Frontend (в другом окне терминала)
-cd frontend && npm run dev
+docker compose -f infra/docker-compose.prod.yml up --build -d
 ```
+
+---
+
+## 📌 Примечание
+
+Для запуска Prisma CLI и миграций необходима переменная `DATABASE_URL` в `.env`.

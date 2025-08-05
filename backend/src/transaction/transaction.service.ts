@@ -1,54 +1,13 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateTransactionDto } from './dto/create-transaction.dto';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Inject, Injectable } from '@nestjs/common';
+import { TransferStrategy } from './strategies/transfer.strategy';
 
 @Injectable()
 export class TransactionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject('TransferStrategy') private readonly strategy: TransferStrategy,
+  ) {}
 
-  async createTransaction(dto: CreateTransactionDto) {
-    const { senderId, receiverId, amount } = dto;
-
-    if (senderId === receiverId) {
-      throw new Error('Sender and receiver must be different');
-    }
-
-    const sender = await this.prisma.user.findUnique({
-      where: { id: senderId },
-    });
-    const receiver = await this.prisma.user.findUnique({
-      where: { id: receiverId },
-    });
-
-    if (!sender || !receiver) {
-      throw new Error('User not found');
-    }
-
-    if (new Decimal(sender.balance).lessThan(amount)) {
-      throw new Error('Insufficient funds');
-    }
-
-    // простая транзакция: списать и начислить
-    return this.prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: senderId },
-        data: { balance: { decrement: amount } },
-      });
-
-      await tx.user.update({
-        where: { id: receiverId },
-        data: { balance: { increment: amount } },
-      });
-
-      return tx.transaction.create({
-        data: {
-          senderId,
-          receiverId,
-          amount,
-          status: 'success',
-        },
-      });
-    });
+  async transfer(senderId: number, receiverId: number, amount: number) {
+    return this.strategy.transfer(senderId, receiverId, amount);
   }
 }
