@@ -13,6 +13,25 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - app-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U appuser -d appdb']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: apps-redis
+    restart: always
+    ports:
+      - '6379:6379'
+    networks:
+      - app-network
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   backend:
     image: ghcr.io/ulietaight/apps-backend:latest
@@ -23,11 +42,17 @@ services:
     ports:
       - '3000:3000'
     environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: appuser
-      DB_PASSWORD: supersecret
-      DB_NAME: appdb
+      DATABASE_URL: postgres://appuser:supersecret@postgres:5432/appdb
+      PORT: 3000
+      TRANSACTION_STRATEGY: ATOMIC 
+      ISOLATION_LEVEL: 'Read Committed'
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   frontend:
     image: ghcr.io/ulietaight/apps-frontend:latest
@@ -37,6 +62,7 @@ services:
       - '80:80'
     networks:
       - app-network
+
 networks:
   app-network:
     driver: bridge
