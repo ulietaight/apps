@@ -34,7 +34,7 @@ services:
       retries: 10
 
   backend:
-    image: ghcr.io/ulietaight/apps-backend:latest
+    image: ghcr.io/${GHCR_USERNAME}/apps-backend:latest
     container_name: apps-backend
     restart: always
     networks:
@@ -55,7 +55,7 @@ services:
         condition: service_healthy
 
   frontend:
-    image: ghcr.io/ulietaight/apps-frontend:latest
+    image: ghcr.io/${GHCR_USERNAME}/apps-frontend:latest
     container_name: apps-frontend
     restart: always
     ports:

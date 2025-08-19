@@ -2,6 +2,9 @@
 
 set -e
 
+# Ensure GHCR_USERNAME is available for docker-compose substitutions
+export GHCR_USERNAME
+
 echo "🔐 Логинимся в GHCR..."
 echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
 
