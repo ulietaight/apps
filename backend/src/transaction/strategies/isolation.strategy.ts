@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransferStrategy } from './transfer.strategy';
-import { Prisma } from '@prisma/client';
 
 const isoMap: Record<string, Prisma.TransactionIsolationLevel> = {
   'Read Uncommitted': 'ReadUncommitted',
