@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransferStrategy } from './transfer.strategy';
 import { Prisma } from '@prisma/client';
@@ -19,7 +20,7 @@ export class IsolationTransferStrategy implements TransferStrategy {
     const isolationLevel = isoMap[levelStr] ?? 'ReadCommitted';
 
     await this.prisma.$transaction(
-      async (tx) => {
+      async (tx: Prisma.TransactionClient) => {
         const sender = await tx.user.findUniqueOrThrow({ where: { id: senderId } });
         await tx.user.findUniqueOrThrow({ where: { id: receiverId } });
         if (Number(sender.balance) < amount) throw new Error('Insufficient funds');

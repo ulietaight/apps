@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransferStrategy } from './transfer.strategy';
 
@@ -8,7 +9,7 @@ export class AtomicTransferStrategy implements TransferStrategy {
   constructor(private readonly prisma: PrismaService) {}
 
   async transfer(senderId: number, receiverId: number, amount: number) {
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const sender = await tx.user.findUniqueOrThrow({ where: { id: senderId } });
       await tx.user.findUniqueOrThrow({ where: { id: receiverId } });
 

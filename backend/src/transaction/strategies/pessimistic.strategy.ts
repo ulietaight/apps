@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransferStrategy } from './transfer.strategy';
 
@@ -7,7 +8,7 @@ export class PessimisticTransferStrategy implements TransferStrategy {
   constructor(private readonly prisma: PrismaService) {}
 
   async transfer(senderId: number, receiverId: number, amount: number): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Lock sender row FOR UPDATE via raw SQL
       const sender: any[] = await tx.$queryRaw<any[]>`SELECT * FROM "User" WHERE id = ${senderId} FOR UPDATE`;
       if (!sender?.[0]) throw new Error('Sender not found');
