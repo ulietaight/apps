@@ -1,4 +1,4 @@
-version: '3.8'
+name: apps
 
 services:
   postgres:
@@ -18,13 +18,12 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    # (опционально) не публикуем порт наружу — база доступна по сети compose
 
   redis:
     image: redis:7
     container_name: apps-redis
     restart: always
-    ports:
-      - '6379:6379'
     networks:
       - app-network
     healthcheck:
@@ -32,6 +31,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    # НЕ публикуем 6379 наружу по соображениям безопасности
 
   backend:
     image: ghcr.io/ulietaight/apps-backend:latest
@@ -42,17 +42,30 @@ services:
     ports:
       - '3000:3000'
     environment:
-      DATABASE_URL: postgres://appuser:supersecret@postgres:5432/appdb
+      NODE_ENV: production
       PORT: 3000
-      TRANSACTION_STRATEGY: ATOMIC 
-      ISOLATION_LEVEL: 'Read Committed'
+      DATABASE_URL: postgres://appuser:supersecret@postgres:5432/appdb
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      TRANSACTION_STRATEGY: ATOMIC
+      # Важно: держи значение в одном стиле с кодом (без пробела)
+      ISOLATION_LEVEL: ReadCommitted
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Если образ позволяет — применим миграции перед стартом API.
+    # Если у тебя свой ENTRYPOINT, эта команда его переопределит.
+    # Убедись, что внутри образа есть npx/prisma и Node.
+    command: >
+      sh -c "npx prisma migrate deploy || true; node dist/main"
+    # (опционально) healthcheck, если есть /health
+    # healthcheck:
+    #   test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/health || exit 1']
+    #   interval: 10s
+    #   timeout: 3s
+    #   retries: 10
 
   frontend:
     image: ghcr.io/ulietaight/apps-frontend:latest
@@ -62,6 +75,15 @@ services:
       - '80:80'
     networks:
       - app-network
+    depends_on:
+      backend:
+        condition: service_started
+    # (опционально) healthcheck, если nginx отдаёт / or /healthz
+    # healthcheck:
+    #   test: ['CMD-SHELL', 'wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1']
+    #   interval: 10s
+    #   timeout: 3s
+    #   retries: 10
 
 networks:
   app-network:
