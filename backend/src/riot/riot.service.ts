@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-const RIOT_API_KEY = process.env.RIOT_API_KEY;
+const RIOT_API_KEY = 'RGAPI-a887b009-9bb6-4b3a-af56-8e5e0e894360'// process.env.RIOT_API_KEY;
 const REGION = 'europe';
 
 @Injectable()
