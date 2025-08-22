@@ -26,3 +26,20 @@ model Transaction {
   sender      User     @relation("Sender", fields: [senderId], references: [id])
   receiver    User     @relation("Receiver", fields: [receiverId], references: [id])
 }
+
+model RiotAccount {
+  puuid    String @id
+  gameName String
+  tagLine  String
+  data     Json
+  matches  Match[]
+
+  @@unique([gameName, tagLine])
+}
+
+model Match {
+  id     String @id
+  puuid  String
+  data   Json
+  account RiotAccount @relation(fields: [puuid], references: [puuid])
+}
