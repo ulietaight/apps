@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { UserModule } from './user/user.module';
 import { TransactionModule } from './transaction/transaction.module';
+import { RiotModule } from './riot/riot.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { TransactionModule } from './transaction/transaction.module';
     UserModule,
     TransactionModule,
     RedisModule,
+    RiotModule,
     // другие модули позже (user, transaction и т.п.)
   ],
   controllers: [AppController],
