@@ -1,0 +1,42 @@
+name: Rotate Riot Key
+
+on:
+  workflow_dispatch:
+    inputs:
+      riot_key:
+        description: "New RIOT_API_KEY (RGAPI_...)"
+        required: true
+        type: string
+
+jobs:
+  rotate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rotate on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          RIOT_KEY: ${{ inputs.riot_key }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: RIOT_KEY
+          script: |
+            set -euo pipefail
+            cd /root/apps
+
+            # 1) вставляем/обновляем строку RIOT_API_KEY в .env (рядом с compose)
+            umask 077
+            if [ -f .env ]; then
+              sed -i "s/^RIOT_API_KEY=.*/RIOT_API_KEY=${RIOT_KEY}/" .env || true
+              grep -q '^RIOT_API_KEY=' .env || echo "RIOT_API_KEY=${RIOT_KEY}" >> .env
+            else
+              echo "RIOT_API_KEY=${RIOT_KEY}" > .env
+            fi
+
+            # 2) пересоздаём ТОЛЬКО backend, чтобы он прочитал новый ключ
+            if [ -f docker-compose.prod.yml ]; then CF=docker-compose.prod.yml; else CF=docker-compose.yaml; fi
+            docker compose -f "$CF" --env-file .env up -d --force-recreate --no-build backend
+
+            # 3) мини-проверка: переменная видна в контейнере
+            docker compose -f "$CF" exec -T backend sh -lc 'test -n "$RIOT_API_KEY" && echo "RIOT_API_KEY=OK" || (echo "RIOT_API_KEY=MISSING"; exit 1)'
