@@ -16,7 +16,6 @@ import { RiotModule } from './riot/riot.module';
     TransactionModule,
     RedisModule,
     RiotModule,
-    // другие модули позже (user, transaction и т.п.)
   ],
   controllers: [AppController],
   providers: [AppService],

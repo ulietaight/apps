@@ -48,8 +48,9 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       TRANSACTION_STRATEGY: ATOMIC
-      # Важно: держи значение в одном стиле с кодом (без пробела)
       ISOLATION_LEVEL: ReadCommitted
+      RIOT_API_KEY: ${RIOT_API_KEY}
+      RIOT_REGIONAL: europe
     depends_on:
       postgres:
         condition: service_healthy

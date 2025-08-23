@@ -1,19 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import Redis from 'ioredis';
+import { RedisModule } from '../redis/redis.module';
+import { Redis as RedisClient } from 'ioredis';
 
-const RIOT_API_KEY = 'RGAPI-a887b009-9bb6-4b3a-af56-8e5e0e894360'; // process.env.RIOT_API_KEY;
-const REGION = 'europe';
-const BATCH_SIZE = 3;
+const RIOT_API_KEY = process.env.RIOT_API_KEY || '';
+const REGION = process.env.RIOT_REGIONAL || 'europe';
+const BATCH_SIZE = 2;
 const BATCH_DELAY_MS = 1200;
 
 @Injectable()
 export class RiotService {
-  private readonly redis = new Redis(
-    process.env.REDIS_URL ?? 'redis://localhost:6379',
-  );
-
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(RedisModule) private readonly redis: RedisClient,
+  ) {}
 
   private async fetchJson(url: string) {
     const res = await fetch(url, {
