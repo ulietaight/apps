@@ -1,69 +1,55 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# === настройки ===
-REPO_DIR="/root/apps"                         # путь к репо на сервере
-COMPOSE_FILE="infra/docker-compose.prod.yml"  # compose-файл (попробуем и альтернативу)
-PROJECT="apps"                                # фиксированное имя проекта
-ENV_FILE="$REPO_DIR/.env"                     # где хранить переменные для compose
+REPO_DIR="/root/apps"
+COMPOSE_FILE="infra/docker-compose.prod.yml"
+PROJECT="apps"
+ENV_FILE="$REPO_DIR/.env"
 
-# === autodetect compose v1/v2 ===
-if command -v docker-compose >/dev/null 2>&1; then
-  COMPOSE="docker-compose"
-elif docker compose version >/dev/null 2>&1; then
-  COMPOSE="docker compose"
-else
-  echo "❌ Docker Compose не найден (ни v1, ни v2)."
-  exit 1
-fi
+# autodetect compose
+if command -v docker-compose >/dev/null 2>&1; then COMPOSE="docker-compose";
+elif docker compose version >/dev/null 2>&1; then COMPOSE="docker compose";
+else echo "❌ Docker Compose не найден"; exit 1; fi
 
 cd "$REPO_DIR"
 
-# === найти compose-файл, если указанного пути нет ===
+# если путь другой – подхватим альтернативные имена
 if [ ! -f "$COMPOSE_FILE" ]; then
-  if [ -f "docker-compose.prod.yml" ]; then
-    COMPOSE_FILE="docker-compose.prod.yml"
-  elif [ -f "docker-compose.yaml" ]; then
-    COMPOSE_FILE="docker-compose.yaml"
-  elif [ -f "docker-compose.yml" ]; then
-    COMPOSE_FILE="docker-compose.yml"
-  else
-    echo "❌ Не нашёл compose-файл (искал $COMPOSE_FILE, docker-compose.prod.yml, docker-compose.yaml, docker-compose.yml)."
-    exit 1
-  fi
+  for f in docker-compose.prod.yml docker-compose.yaml docker-compose.yml; do
+    [ -f "$f" ] && COMPOSE_FILE="$f" && break
+  done
+  [ -f "$COMPOSE_FILE" ] || { echo "❌ Не нашёл compose-файл"; exit 1; }
 fi
 
-# === секреты из окружения (передаются из GitHub Actions) ===
-: "${GHCR_USERNAME:?GHCR_USERNAME not set}"
-: "${GHCR_TOKEN:?GHCR_TOKEN not set}"
-: "${RIOT_API_KEY:?RIOT_API_KEY not set}"   # ← обязателен
+# --- обязательный секрет Riot ---
+: "${RIOT_API_KEY:?RIOT_API_KEY not set}"
 
-# === пишем .env для compose (только нужные переменные) ===
+# пишем .env для compose
 umask 077
-{
-  printf "RIOT_API_KEY=%s\n" "${RIOT_API_KEY}"
-  # при необходимости добавь и другие:
-  # printf "RIOT_REGIONAL=%s\n" "${RIOT_REGIONAL:-europe}"
-} > "$ENV_FILE"
+printf "RIOT_API_KEY=%s\n" "${RIOT_API_KEY}" > "$ENV_FILE"
 
-echo "🔐 Логинимся в GHCR..."
-echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
+# --- GHCR login (опционально) ---
+if [ -n "${GHCR_USERNAME:-}" ] && [ -n "${GHCR_TOKEN:-}" ]; then
+  echo "🔐 Логинимся в GHCR..."
+  echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
+  echo "📥 Тянем свежие образы..."
+  docker pull "ghcr.io/${GHCR_USERNAME}/apps-backend:latest" || true
+  docker pull "ghcr.io/${GHCR_USERNAME}/apps-frontend:latest" || true
+else
+  echo "ℹ️ Пропускаю GHCR login/pull (нет GHCR_USERNAME/GHCR_TOKEN)"
+fi
 
-echo "📥 Тянем свежие образы..."
-docker pull "ghcr.io/${GHCR_USERNAME}/apps-backend:latest"
-docker pull "ghcr.io/${GHCR_USERNAME}/apps-frontend:latest"
-
-echo "🧹 Останавливаем/чистим старый стек..."
+echo "🧹 Останавливаем старый стек..."
 $COMPOSE -f "$COMPOSE_FILE" -p "$PROJECT" down --remove-orphans || true
 
 echo "🚀 Запускаем прод..."
 $COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT" up -d --pull always --no-build
 
-# быстрая проверка, что ключ попал внутрь контейнера (не печатает сам ключ)
+# проверим, что RIOT_API_KEY внутри контейнера есть
 $COMPOSE -f "$COMPOSE_FILE" -p "$PROJECT" exec -T backend sh -lc 'test -n "$RIOT_API_KEY" && echo "RIOT_API_KEY=OK" || (echo "RIOT_API_KEY=MISSING"; exit 1)'
 
-echo "🧼 Чистим неиспользуемые образы (dangling)..."
+echo "🧼 Чистим dangling-образы..."
 docker image prune -f
 
-echo "✅ Готово. Статус:"
+echo "✅ Готово:"
 $COMPOSE -f "$COMPOSE_FILE" -p "$PROJECT" ps

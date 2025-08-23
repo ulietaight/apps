@@ -32,6 +32,10 @@ jobs:
 
     - name: 🚀 Deploy to VPS
       uses: appleboy/ssh-action@v1.0.3
+      env:
+        GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+        GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
       with:
         host: ${{ secrets.SSH_HOST }}
         username: ${{ secrets.SSH_USER }}
@@ -44,7 +48,4 @@ jobs:
           fi
           cd apps
           git pull origin main || true
-          export GHCR_USERNAME="${GHCR_USERNAME}"
-          export GHCR_TOKEN="${GHCR_TOKEN}"
-          export RIOT_API_KEY="${RIOT_API_KEY}"
           bash infra/scripts/deploy.sh
