@@ -1,52 +1,59 @@
-name: Docker CI
+name: Rotate Riot Key
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      riot_key:
+        description: "New RIOT_API_KEY (RGAPI_...)"
+        required: true
+        type: string
 
 jobs:
-  build-and-push:
+  rotate:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ secrets.GHCR_USERNAME }} --password-stdin
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build & Push Backend
-        run: |
-          docker build -f infra/docker/backend.Dockerfile -t ghcr.io/${{ secrets.GHCR_USERNAME }}/apps-backend:latest ./backend
-          docker push ghcr.io/${{ secrets.GHCR_USERNAME }}/apps-backend:latest
-
-      - name: Build & Push Frontend
-        run: |
-          docker build -f infra/docker/frontend.Dockerfile -t ghcr.io/${{ secrets.GHCR_USERNAME }}/apps-frontend:latest .
-          docker push ghcr.io/${{ secrets.GHCR_USERNAME }}/apps-frontend:latest
-
-      - name: 🚀 Deploy to VPS
+      - name: Rotate on VPS
         uses: appleboy/ssh-action@v1.0.3
         env:
-          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-          RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}   # ← добавь секрет в репо
+          RIOT_KEY: ${{ inputs.riot_key }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: GHCR_USERNAME,GHCR_TOKEN,RIOT_API_KEY
+          envs: RIOT_KEY
           script: |
             set -euo pipefail
-            cd ~
-            if [ ! -d "apps" ]; then
-              git clone https://github.com/${{ github.repository }} apps
+            cd /root/apps
+
+            # показать, что за файлы есть
+            echo "CWD: $(pwd)"; ls -la
+
+            # обновляем/создаём .env
+            umask 077
+            if [ -f .env ]; then
+              sed -i "s/^RIOT_API_KEY=.*/RIOT_API_KEY=${RIOT_KEY}/" .env || true
+              grep -q '^RIOT_API_KEY=' .env || echo "RIOT_API_KEY=${RIOT_KEY}" >> .env
+            else
+              echo "RIOT_API_KEY=${RIOT_KEY}" > .env
             fi
-            cd apps
-            git pull origin main || true
-            bash infra/scripts/deploy.sh
+
+            # найти compose-файл умно
+            CF=""
+            for cand in \
+              docker-compose.prod.yml docker-compose.prod.yaml \
+              docker-compose.yml docker-compose.yaml \
+              infra/docker-compose.prod.yml infra/docker-compose.prod.yaml \
+              infra/docker/docker-compose.prod.yml infra/docker/docker-compose.prod.yaml
+            do
+              [ -f "$cand" ] && CF="$cand" && break
+            done
+            if [ -z "$CF" ]; then
+              echo "❌ Не нашёл compose-файл"; find . -maxdepth 3 -type f -iname 'docker-compose*.y*'; exit 1
+            fi
+            echo "Compose file: $CF"
+
+            # мягкий рестарт только backend
+            docker compose -f "$CF" --env-file .env up -d --force-recreate --no-build backend
+
+            # проверка наличия переменной
+            docker compose -f "$CF" exec -T backend sh -lc 'test -n "$RIOT_API_KEY" && echo "RIOT_API_KEY=OK" || (echo "RIOT_API_KEY=MISSING"; exit 1)'
