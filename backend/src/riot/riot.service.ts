@@ -19,6 +19,23 @@ export class RiotService {
     return new Promise((r) => setTimeout(r, ms));
   }
 
+  private simplifyMatch(puuid: string, match: any) {
+    const participant = match.info.participants.find(
+      (p: any) => p.puuid === puuid,
+    );
+    return {
+      id: match.metadata.matchId,
+      champion: participant.championName,
+      kills: participant.kills,
+      deaths: participant.deaths,
+      assists: participant.assists,
+      win: participant.win,
+      gameDuration: match.info.gameDuration,
+      gameMode: match.info.gameMode,
+      gameStart: match.info.gameStartTimestamp,
+    };
+  }
+
   private async fetchJson(url: string, attempt = 0): Promise<any> {
     const res = await fetch(url, { headers: { 'X-Riot-Token': RIOT_API_KEY } });
     console.log('res', res)
@@ -91,6 +108,12 @@ export class RiotService {
     const account = await this.getAccount(gameName, tagLine);
     const { puuid } = account;
 
+    const cacheKey = `matches:${puuid}`;
+    const cachedMatches = await this.redis.get(cacheKey);
+    if (cachedMatches) {
+      return JSON.parse(cachedMatches);
+    }
+
     const idsCacheKey = `matches_ids:${puuid}`;
     const cachedIds = await this.redis.get(idsCacheKey);
     let matchIds: string[];
@@ -103,15 +126,16 @@ export class RiotService {
       await this.redis.set(idsCacheKey, JSON.stringify(matchIds), 'EX', 30);
     }
 
-    const matches: any[] = [];
+    const fullMatches: any[] = [];
     for (let i = 0; i < matchIds.length; i += BATCH_SIZE) {
       const batch = matchIds.slice(i, i + BATCH_SIZE);
       const batchMatches = await Promise.all(batch.map((id) => this.getMatch(puuid, id)));
-      matches.push(...batchMatches);
+      fullMatches.push(...batchMatches);
       await this.sleep(BATCH_DELAY_MS);
     }
 
-    await this.redis.set(`matches:${puuid}`, JSON.stringify(matches), 'EX', 30);
-    return matches;
+    const simplified = fullMatches.map((m) => this.simplifyMatch(puuid, m));
+    await this.redis.set(cacheKey, JSON.stringify(simplified), 'EX', 30);
+    return simplified;
   }
 }

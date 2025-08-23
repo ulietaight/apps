@@ -1,10 +1,24 @@
 import { useEffect, useState } from 'react';
 
+interface MatchSummary {
+  id: string;
+  champion: string;
+  kills: number;
+  deaths: number;
+  assists: number;
+  win: boolean;
+  gameDuration: number;
+  gameMode: string;
+  gameStart: number;
+}
+
+const CDN_VERSION = '14.14.1';
+
 function App() {
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const [gameName, setGameName] = useState('');
   const [tagLine, setTagLine] = useState('');
-  const [matches, setMatches] = useState<any[]>([]);
+  const [matches, setMatches] = useState<MatchSummary[]>([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -13,9 +27,9 @@ function App() {
         const response = await fetch('/api/health');
         const data = await response.json();
         setIsOnline(data.status === 'ok');
-      } catch (error) {
-        setIsOnline(false);
-      }
+        } catch {
+          setIsOnline(false);
+        }
     };
 
     checkHealth();
@@ -42,11 +56,11 @@ function App() {
         )}`,
       );
       if (!res.ok) throw new Error('failed');
-      const data = await res.json();
+      const data: MatchSummary[] = await res.json();
       setMatches(data);
-    } catch (err) {
-      setError('Не удалось загрузить матчи');
-    }
+      } catch {
+        setError('Не удалось загрузить матчи');
+      }
   };
 
   return (
@@ -79,9 +93,28 @@ function App() {
 
       {error && <div className="text-red-500">{error}</div>}
 
-      <ul className="list-disc pl-5">
+      <ul className="space-y-2">
         {matches.map((m) => (
-          <li key={m?.metadata?.matchId}>{m?.metadata?.matchId}</li>
+          <li
+            key={m.id}
+            className={`flex items-center gap-3 p-2 border rounded ${
+              m.win ? 'bg-green-50' : 'bg-red-50'
+            }`}
+          >
+            <img
+              src={`https://ddragon.leagueoflegends.com/cdn/${CDN_VERSION}/img/champion/${m.champion}.png`}
+              alt={m.champion}
+              className="w-12 h-12"
+            />
+            <div className="flex flex-col">
+              <span className="font-semibold">
+                {m.champion} - {m.win ? 'Win' : 'Loss'}
+              </span>
+              <span className="text-sm">
+                {m.kills}/{m.deaths}/{m.assists}
+              </span>
+            </div>
+          </li>
         ))}
       </ul>
     </div>
