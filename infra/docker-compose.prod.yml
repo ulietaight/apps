@@ -49,7 +49,7 @@ services:
       REDIS_PORT: 6379
       TRANSACTION_STRATEGY: ATOMIC
       ISOLATION_LEVEL: ReadCommitted
-      RIOT_API_KEY: ${RIOT_API_KEY}
+      RIOT_API_KEY: "RGAPI-70aecebb-12bd-43da-a7d4-66792cbe5535"
       RIOT_REGIONAL: europe
     depends_on:
       postgres:
