@@ -58,13 +58,16 @@ export class RiotService {
     });
 
     await this.redis.set(cacheKey, JSON.stringify(account), 'EX', 3600);
+
     return account;
   }
 
   private async getMatch(puuid: string, id: string) {
     const cacheKey = `match:${id}`;
     const cached = await this.redis.get(cacheKey);
-    if (cached) return JSON.parse(cached);
+    if (cached) {
+      return JSON.parse(cached);
+    }
 
     const dbMatch = await this.prisma.match.findUnique({ where: { id } });
     if (dbMatch) {
