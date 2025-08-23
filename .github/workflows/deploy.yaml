@@ -1,0 +1,48 @@
+name: Deploy apps to server
+
+on:
+  push:
+    branches: [ main ]  # или твоя ветка
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          # можно включить debug: true
+          # Передаём секреты как env на удалённую машину:
+          envs: RIOT_API_KEY,GHCR_TOKEN,GHCR_USER
+          script: |
+            set -euo pipefail
+
+            # 1) Путь к проекту на сервере
+            APP_DIR="/root/apps"   # поменяй, если у тебя другой путь
+            cd "$APP_DIR"
+
+            # 2) Создаём/обновляем .env для compose (только Riot ключ)
+            umask 077
+            printf "RIOT_API_KEY=%s\n" "${RIOT_API_KEY}" > .env
+
+            # 3) (опционально) Логин в GHCR, если образы приватные
+            if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
+              echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            fi
+
+            # 4) Обновляем стек
+            docker compose -f docker-compose.prod.yml --env-file .env pull
+            docker compose -f docker-compose.prod.yml --env-file .env up -d
+
+            # 5) Быстрая проверка, что ключ попал внутрь контейнера (не печатает сам ключ)
+            docker compose -f docker-compose.prod.yml exec -T backend sh -lc 'test -n "$RIOT_API_KEY" && echo "RIOT_API_KEY=OK" || (echo "RIOT_API_KEY=MISSING"; exit 1)'
+
+            # 6) Проверка доступности сервисов (по желанию)
+            docker compose -f docker-compose.prod.yml ps
