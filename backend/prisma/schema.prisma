@@ -28,18 +28,22 @@ model Transaction {
 }
 
 model RiotAccount {
-  puuid    String @id
-  gameName String
-  tagLine  String
-  data     Json
-  matches  Match[]
+  puuid     String   @id
+  gameName  String
+  tagLine   String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@unique([gameName, tagLine])
+  @@index([gameName, tagLine])
 }
 
 model Match {
-  id     String @id
-  puuid  String
-  data   Json
-  account RiotAccount @relation(fields: [puuid], references: [puuid])
+  id        String   @id            
+  puuid     String
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([puuid])
 }
