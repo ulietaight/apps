@@ -36,26 +36,15 @@ jobs:
         host: ${{ secrets.SSH_HOST }}
         username: ${{ secrets.SSH_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
-        envs: RIOT_API_KEY,GHCR_TOKEN,GHCR_USERNAME
+        envs: GHCR_USERNAME,GHCR_TOKEN,RIOT_API_KEY
         script: |
-          set -euo pipefail
-          cd ~/apps
-          # код уже есть — подтягиваем свежий
-          git pull origin main || true
-
-          # создаём .env для docker compose (только нужные переменные)
-          umask 077
-          printf "RIOT_API_KEY=%s\n" "$RIOT_API_KEY" > .env
-
-          # логин в GHCR, если образы приватные
-          if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USERNAME:-}" ]; then
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+          cd ~
+          if [ ! -d "apps" ]; then
+            git clone https://github.com/${{ github.repository }} apps
           fi
-
-          # обновляем стек
-          docker compose -f docker-compose.prod.yml --env-file .env pull
-          docker compose -f docker-compose.prod.yml --env-file .env up -d
-
-          # быстрая проверка — ключ попал внутрь контейнера
-          docker compose -f docker-compose.prod.yml exec -T backend sh -lc 'test -n "$RIOT_API_KEY" && echo "RIOT_API_KEY=OK" || (echo "RIOT_API_KEY=MISSING"; exit 1)'
-
+          cd apps
+          git pull origin main || true
+          export GHCR_USERNAME="${GHCR_USERNAME}"
+          export GHCR_TOKEN="${GHCR_TOKEN}"
+          export RIOT_API_KEY="${RIOT_API_KEY}"
+          bash infra/scripts/deploy.sh
