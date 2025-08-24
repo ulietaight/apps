@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import BackendStatus from './components/BackendStatus';
 
 interface MatchSummary {
   id: string;
@@ -15,35 +16,10 @@ interface MatchSummary {
 const CDN_VERSION = '14.14.1';
 
 function App() {
-  const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const [gameName, setGameName] = useState('');
   const [tagLine, setTagLine] = useState('');
   const [matches, setMatches] = useState<MatchSummary[]>([]);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    const checkHealth = async () => {
-      try {
-        const response = await fetch('/api/health');
-        const data = await response.json();
-        setIsOnline(data.status === 'ok');
-        } catch {
-          setIsOnline(false);
-        }
-    };
-
-    checkHealth();
-    const interval = setInterval(checkHealth, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const getStatusText = () => {
-    if (isOnline === null) return 'Проверка...';
-    return isOnline ? 'Backend Online' : 'Backend Offline';
-  };
-
-  const statusColor =
-    isOnline === null ? 'bg-gray-400' : isOnline ? 'bg-green-500' : 'bg-red-500';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,36 +40,30 @@ function App() {
   };
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="flex items-center gap-3">
-        <div
-          className={`w-4 h-4 rounded-full ${statusColor} animate-pulse`}
-          title={getStatusText()}
-        ></div>
-        <span className="text-sm text-gray-700">{getStatusText()}</span>
-      </div>
-
-      <form onSubmit={handleSubmit} className="flex gap-2">
+    <div className="min-h-screen bg-gray-100 p-4 flex flex-col items-center">
+      <BackendStatus />
+      <h1 className="text-2xl font-bold mb-4">Match History</h1>
+      <form onSubmit={handleSubmit} className="flex gap-2 mb-6">
         <input
           value={gameName}
           onChange={(e) => setGameName(e.target.value)}
           placeholder="Game Name"
-          className="border p-1"
+          className="border p-1 rounded"
         />
         <input
           value={tagLine}
           onChange={(e) => setTagLine(e.target.value)}
           placeholder="Tag Line"
-          className="border p-1"
+          className="border p-1 rounded"
         />
-        <button type="submit" className="bg-blue-500 text-white px-2">
+        <button type="submit" className="bg-blue-500 text-white px-3 rounded">
           Войти
         </button>
       </form>
 
-      {error && <div className="text-red-500">{error}</div>}
+      {error && <div className="text-red-500 mb-4">{error}</div>}
 
-      <ul className="space-y-2">
+      <ul className="space-y-2 w-full max-w-md">
         {matches.map((m) => (
           <li
             key={m.id}

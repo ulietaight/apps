@@ -2,11 +2,18 @@ import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { REDIS_CLIENT } from '../redis/redis.module';
 import { Redis as RedisClient } from 'ioredis';
+import { Counter } from 'prom-client';
 
 const RIOT_API_KEY = process.env.RIOT_API_KEY || '';
 const REGION = process.env.RIOT_REGIONAL || 'europe';
 const BATCH_SIZE = 2;
 const BATCH_DELAY_MS = 1200;
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
+const riotApiRequests = new Counter({
+  name: 'riot_api_requests_total',
+  help: 'Total Riot API requests',
+});
 
 @Injectable()
 export class RiotService {
@@ -37,9 +44,8 @@ export class RiotService {
   }
 
   private async fetchJson(url: string, attempt = 0): Promise<any> {
+    riotApiRequests.inc();
     const res = await fetch(url, { headers: { 'X-Riot-Token': RIOT_API_KEY } });
-    console.log('res', res)
-    console.log('RIOT_API_KEY', RIOT_API_KEY)
 
     if (res.status === 429 && attempt < 5) {
       const ra = Number(res.headers.get('retry-after') || 1) * 1000;
@@ -109,22 +115,48 @@ export class RiotService {
     const { puuid } = account;
 
     const cacheKey = `matches:${puuid}`;
-    const cachedMatches = await this.redis.get(cacheKey);
-    if (cachedMatches) {
-      return JSON.parse(cachedMatches);
+    const cached = await this.redis.get(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Date.now() - parsed.fetchedAt < ONE_HOUR_MS) {
+        return parsed.matches;
+      }
     }
 
-    const idsCacheKey = `matches_ids:${puuid}`;
-    const cachedIds = await this.redis.get(idsCacheKey);
-    let matchIds: string[];
+    const dbHistory = await this.prisma.matchHistory.findUnique({ where: { puuid } });
+    if (dbHistory) {
+      if (Date.now() - dbHistory.updatedAt.getTime() < ONE_HOUR_MS) {
+        await this.redis.set(
+          cacheKey,
+          JSON.stringify({ matches: dbHistory.matches, fetchedAt: Date.now() }),
+          'EX',
+          3600,
+        );
+        return dbHistory.matches as any[];
+      }
 
-    if (cachedIds) {
-      matchIds = JSON.parse(cachedIds);
-    } else {
-      const idsUrl = `https://${REGION}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=10`;
-      matchIds = await this.fetchJson(idsUrl);
-      await this.redis.set(idsCacheKey, JSON.stringify(matchIds), 'EX', 30);
+      const latestIds = await this.fetchJson(
+        `https://${REGION}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=1`,
+      );
+      const latestId = latestIds[0];
+      const hasLatest = (dbHistory.matches as any[]).some((m: any) => m.id === latestId);
+      if (hasLatest) {
+        await this.prisma.matchHistory.update({
+          where: { puuid },
+          data: { updatedAt: new Date() },
+        });
+        await this.redis.set(
+          cacheKey,
+          JSON.stringify({ matches: dbHistory.matches, fetchedAt: Date.now() }),
+          'EX',
+          3600,
+        );
+        return dbHistory.matches as any[];
+      }
     }
+
+    const idsUrl = `https://${REGION}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=10`;
+    const matchIds: string[] = await this.fetchJson(idsUrl);
 
     const fullMatches: any[] = [];
     for (let i = 0; i < matchIds.length; i += BATCH_SIZE) {
@@ -135,7 +167,20 @@ export class RiotService {
     }
 
     const simplified = fullMatches.map((m) => this.simplifyMatch(puuid, m));
-    await this.redis.set(cacheKey, JSON.stringify(simplified), 'EX', 30);
+
+    await this.prisma.matchHistory.upsert({
+      where: { puuid },
+      update: { matches: simplified },
+      create: { puuid, matches: simplified },
+    });
+
+    await this.redis.set(
+      cacheKey,
+      JSON.stringify({ matches: simplified, fetchedAt: Date.now() }),
+      'EX',
+      3600,
+    );
+
     return simplified;
   }
 }
