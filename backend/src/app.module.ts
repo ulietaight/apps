@@ -7,6 +7,7 @@ import { RedisModule } from './redis/redis.module';
 import { UserModule } from './user/user.module';
 import { TransactionModule } from './transaction/transaction.module';
 import { RiotModule } from './riot/riot.module';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { RiotModule } from './riot/riot.module';
     TransactionModule,
     RedisModule,
     RiotModule,
+    MetricsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

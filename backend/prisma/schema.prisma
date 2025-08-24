@@ -39,11 +39,17 @@ model RiotAccount {
 }
 
 model Match {
-  id        String   @id            
+  id        String   @id
   puuid     String
   data      Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([puuid])
+}
+
+model MatchHistory {
+  puuid    String @id
+  matches  Json
+  updatedAt DateTime @updatedAt
 }
