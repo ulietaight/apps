@@ -1,0 +1,84 @@
+import {
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { UserService } from '../user/user.service';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
+import { JwtPayload } from './types/jwt-payload.type';
+import { UserEntity } from '../../common/db/entities/user.entity';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private readonly userService: UserService,
+    private readonly jwt: JwtService,
+  ) {}
+
+  async validateUser(
+    email: string,
+    password: string,
+  ): Promise<UserEntity | null> {
+    const user = await this.userService.findByEmail(email);
+    if (!user) return null;
+
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) return null;
+
+    return user;
+  }
+
+  private getTokens(user: UserEntity) {
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      tokenVersion: user.tokenVersion,
+    };
+
+    const accessToken = this.jwt.sign(payload, {
+      secret: process.env.JWT_ACCESS_SECRET || 'access_secret',
+      expiresIn: '15m' as const,
+    });
+
+    const refreshToken = this.jwt.sign(payload, {
+      secret: process.env.JWT_REFRESH_SECRET || 'refresh_secret',
+      expiresIn: '30d',
+    });
+
+    return { accessToken, refreshToken };
+  }
+
+  async login(email: string, password: string) {
+    const user = await this.validateUser(email, password);
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const tokens = this.getTokens(user);
+    return { user, ...tokens };
+  }
+
+  async refresh(refreshToken: string) {
+    try {
+      const payload = this.jwt.verify(refreshToken, {
+        secret: process.env.JWT_REFRESH_SECRET,
+      });
+
+      const user = await this.userService.findById(payload.sub);
+      if (!user) throw new UnauthorizedException();
+
+      if (user.tokenVersion !== payload.tokenVersion) {
+        throw new UnauthorizedException('Token invalidated');
+      }
+
+      return this.getTokens(user);
+    } catch (err) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+  }
+
+  async logout(userId: string) {
+    await this.userService.incrementTokenVersion(userId);
+  }
+}

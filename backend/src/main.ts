@@ -1,24 +1,44 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
-import helmet from 'helmet';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import { Logger } from 'nestjs-pino';
+
+import fastifyCors from '@fastify/cors';
+import fastifyHelmet from '@fastify/helmet';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, transform: true, forbidUnknownValues: true }),
+  const adapter = new FastifyAdapter();
+
+  adapter.register(fastifyCors, {
+    origin: true,
+    credentials: true,
+  });
+
+  adapter.register(fastifyHelmet, {
+    contentSecurityPolicy: false,
+  });
+
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    adapter,
+    { bufferLogs: true },
   );
-  app.use(helmet());
 
-  const config = new DocumentBuilder()
-    .setTitle('Transactions API')
-    .setDescription('API for transaction strategies training app')
-    .setVersion('1.0.0')
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidUnknownValues: true,
+    }),
+  );
 
-  await app.listen(process.env.PORT ? Number(process.env.PORT) : 3000);
+  app.useLogger(app.get(Logger));
+
+  await app.listen(
+    process.env.PORT ? Number(process.env.PORT) : 3000,
+    '0.0.0.0',
+  );
 }
+
 bootstrap();

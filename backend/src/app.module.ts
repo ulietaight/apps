@@ -1,29 +1,36 @@
+import * as Joi from 'joi';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { PrismaModule } from './prisma/prisma.module';
-import { RedisModule } from './redis/redis.module';
-import { UserModule } from './user/user.module';
-import { TransactionModule } from './transaction/transaction.module';
-import { RiotModule } from './riot/riot.module';
-import { MetricsModule } from './metrics/metrics.module';
-import { KafkaModule } from './kafka/kafka.module';
-import { ProfilesModule } from './profiles/profiles.module';
+import { DbModule } from './common/db/db.module';
+import { UserModule } from './domains/user/user.module';
+import { AuthModule } from './domains/auth/auth.module';
+import { envValidationSchema } from './common/config/env';
+import { LoggerModule } from 'nestjs-pino';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
-    PrismaModule,
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validationSchema: Joi.object(envValidationSchema),
+    }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: 'debug',
+        transport: {
+          target: 'pino-pretty',
+          options: {
+            colorize: true,
+            translateTime: 'SYS:HH:MM:ss',
+            ignore: 'pid,hostname',
+          },
+        },
+      },
+    }),
+    DbModule,
     UserModule,
-    TransactionModule,
-    RedisModule,
-    RiotModule,
-    MetricsModule,
-    KafkaModule,
-    ProfilesModule,
+    AuthModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [],
+  providers: [],
 })
 export class AppModule {}
