@@ -8,4 +8,6 @@ export const envValidationSchema = {
   POSTGRES_HOST: Joi.string().required(),
   POSTGRES_PORT: Joi.number().required(),
   HTTP_HEALTHCHECK_PORT: Joi.number().default(9090),
+  JWT_ACCESS_SECRET: Joi.string().required(),
+  JWT_REFRESH_SECRET: Joi.string().required(),
 };

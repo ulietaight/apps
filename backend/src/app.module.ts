@@ -2,7 +2,7 @@ import * as Joi from 'joi';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DbModule } from './common/db/db.module';
-import { UserModule } from './domains/user/user.module';
+import { UsersModule } from './domains/users/users.module';
 import { AuthModule } from './domains/auth/auth.module';
 import { envValidationSchema } from './common/config/env';
 import { LoggerModule } from 'nestjs-pino';
@@ -27,7 +27,7 @@ import { LoggerModule } from 'nestjs-pino';
       },
     }),
     DbModule,
-    UserModule,
+    UsersModule,
     AuthModule,
   ],
   controllers: [],
